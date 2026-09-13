@@ -1,0 +1,6 @@
+target/
+frontend/
+.git/
+.gitignore
+*.md
+docs/
