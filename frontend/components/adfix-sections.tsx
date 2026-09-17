@@ -22,8 +22,8 @@ const openPurchase = () => { window.location.href = "/buy" }
  * - Custom Embed / VdoCipher: Any embed URL (e.g. "https://player.vdocipher.com/...")
  */
 export const VSL_VIDEO_CONFIG = {
-  url: process.env.NEXT_PUBLIC_VSL_VIDEO_URL || "https://player.vdocipher.com/v2/?otp=20160313versASE3232llT7PwvAw9U5GcsxgNnwJlncTMl8mLnwYtrMptOZOOCYx&playbackInfo=eyJ2aWRlb0lkIjoiZjQyNjVlZGRmODMzNGRmYjk4ZDJhMzQzMDZhMjZkNjUifQ==",
-  duration: "10:00",
+  url: process.env.NEXT_PUBLIC_VSL_VIDEO_URL || "https://youtube.com/shorts/Ycm8t1w4Yig?si=EZawOUkehVLN4AlX",
+  duration: "00:59",
 }
 
 function parseVideoSource(rawUrl?: string) {
