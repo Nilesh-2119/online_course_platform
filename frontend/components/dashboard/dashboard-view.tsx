@@ -183,7 +183,15 @@ export function DashboardView() {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
   }
 
-  // Determine current active lesson for recent playback card
+  // Determine welcome / overview lesson or first lesson
+  const welcomeLesson = lessons.find(
+    (l) =>
+      l.title?.toLowerCase().includes("welcome") ||
+      l.title?.toLowerCase().includes("overview") ||
+      l.title?.toLowerCase().includes("intro")
+  ) || lessons[0]
+
+  const overviewHref = `/dashboard/course/${welcomeLesson?.id || lessons[0]?.id || "1"}`
   const activeLesson = lessons.find((l) => String(l.id) === String(progress.currentLessonId)) || lessons[0]
   const completedCount = progress.completedLessons || (isPurchased ? 1 : 0)
   const totalCount = lessons.length || progress.totalLessons || 4
@@ -359,27 +367,27 @@ export function DashboardView() {
             <div className="mt-8 space-y-8">
               {/* 2-Column Grid: Recent Video Played & Notifications */}
               <div className="grid gap-6 lg:grid-cols-12">
-                {/* 1. Recent Video Played Card (7 Cols) */}
+                {/* 1. Welcome Video / Course Overview Card (7 Cols) */}
                 <div className="lg:col-span-7 flex flex-col justify-between rounded-3xl border border-border bg-background p-6 md:p-7 shadow-sm">
                   <div>
                     <div className="flex items-center justify-between">
                       <span className="inline-flex items-center gap-1.5 font-mono text-[11px] font-bold tracking-wider text-muted-foreground uppercase">
-                        <PlayCircle className="size-4 text-accent" /> RECENT VIDEO PLAYED
+                        <PlayCircle className="size-4 text-accent" /> WELCOME VIDEO / COURSE OVERVIEW
                       </span>
-                      <span className="rounded-full bg-muted px-2.5 py-0.5 font-mono text-[10px] text-muted-foreground">
-                        {isPurchased ? "READY TO PLAY" : activeLesson?.hasPreview ? "FREE PREVIEW" : "LOCKED"}
+                      <span className="rounded-full bg-accent/20 px-2.5 py-0.5 font-mono text-[10px] font-bold text-accent-foreground">
+                        START HERE
                       </span>
                     </div>
 
                     <div className="mt-5 group relative aspect-video overflow-hidden rounded-2xl border border-border bg-foreground">
                       <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(204,255,0,.25),transparent_70%)]" />
                       <div className="absolute left-4 top-4 font-mono text-xs font-bold text-accent">
-                        LESSON 0{activeLesson?.order || 1}
+                        COURSE OVERVIEW
                       </div>
 
                       {/* Play Button Overlay */}
                       <Link
-                        href={resumeHref}
+                        href={overviewHref}
                         className="absolute inset-0 m-auto grid size-14 place-items-center rounded-full border border-accent bg-accent text-accent-foreground shadow-lg transition-transform group-hover:scale-110 active:scale-95"
                       >
                         <Play className="size-6 fill-current ml-1" />
@@ -387,26 +395,28 @@ export function DashboardView() {
 
                       <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between text-background font-mono text-[11px]">
                         <span className="rounded-md bg-black/60 px-2 py-1 backdrop-blur font-bold">
-                          {activeLesson?.title}
+                          {welcomeLesson?.title || "Welcome to AdFix Masterclass"}
                         </span>
                         <span className="rounded-md bg-black/60 px-2 py-1 backdrop-blur">
-                          {activeLesson?.duration ? `${Math.floor(activeLesson.duration / 60)} mins` : "12 mins"}
+                          {welcomeLesson?.duration ? `${Math.floor(welcomeLesson.duration / 60)} mins` : "Overview"}
                         </span>
                       </div>
                     </div>
 
-                    <h3 className="mt-4 text-xl font-black tracking-tight">{activeLesson?.title}</h3>
+                    <h3 className="mt-4 text-xl font-black tracking-tight">
+                      {welcomeLesson?.title ? `Course Overview: ${welcomeLesson.title}` : "Welcome to AdFix Studio – Course Overview"}
+                    </h3>
                     <p className="mt-1 font-mono text-xs text-muted-foreground line-clamp-2">
-                      {activeLesson?.description || "Master the fundamental frameworks of high-converting ads."}
+                      {welcomeLesson?.description || "Watch this quick orientation before starting your lessons to understand how to get the most out of the curriculum, resources, and frameworks."}
                     </p>
                   </div>
 
                   <div className="mt-6 pt-4 border-t border-border flex items-center justify-between">
                     <Link
-                      href={resumeHref}
+                      href={overviewHref}
                       className="inline-flex items-center gap-2 rounded-full bg-foreground px-5 py-2.5 font-mono text-xs font-bold text-background transition-transform hover:scale-[1.02] active:scale-95"
                     >
-                      <Play className="size-3.5 fill-current text-accent" /> RESUME PLAYBACK
+                      <Play className="size-3.5 fill-current text-accent" /> WATCH COURSE OVERVIEW
                     </Link>
                     <button
                       onClick={() => setSection("courses")}
@@ -478,10 +488,10 @@ export function DashboardView() {
                       onClick={handleSyncVideos}
                       disabled={isSyncing}
                       className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-1.5 font-mono text-[11px] font-bold text-foreground hover:border-accent transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
-                      title="Sync latest videos from VdoCipher"
+                      title="Refresh latest lessons"
                     >
                       <RefreshCw className={cn("size-3 text-accent", isSyncing && "animate-spin")} />
-                      {isSyncing ? "SYNCING..." : "SYNC VDOCIPHER"}
+                      {isSyncing ? "Refreshing..." : "Refresh"}
                     </button>
                     <span className="font-mono text-xs text-muted-foreground">
                       {lessons.length} Total Lessons
