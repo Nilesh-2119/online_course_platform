@@ -50,7 +50,7 @@ function parseVideoSource(rawUrl?: string) {
   if (ytMatch && ytMatch[1]) {
     return {
       type: "iframe" as const,
-      src: `https://www.youtube-nocookie.com/embed/${ytMatch[1]}?autoplay=1&rel=0&modestbranding=1`,
+      src: `https://www.youtube-nocookie.com/embed/${ytMatch[1]}?autoplay=1&rel=0&modestbranding=1&playsinline=1`,
     }
   }
 
