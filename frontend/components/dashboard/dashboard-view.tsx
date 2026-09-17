@@ -32,6 +32,7 @@ import { formatCurrency, cn } from "@/lib/utils"
 import { mockCourses, mockLessons } from "@/mocks/seed-data"
 import { resourceService } from "@/lib/api"
 import { getCourseProgress, getCourseLessons, syncVdoCipherVideos, getVideoPlayback } from "@/lib/api/course-service"
+import { recordVideoView } from "@/lib/api/analytics-service"
 import type { CourseLesson, CourseProgress, FreeResource } from "@/lib/types"
 
 interface NotificationItem {
@@ -209,6 +210,9 @@ export function DashboardView() {
 
     setWelcomePlaybackLoading(true)
     setWelcomePlaybackError(null)
+
+    // Record Welcome video watch in database
+    recordVideoView("WELCOME", String(targetLesson.id)).catch(() => {})
 
     try {
       const res = await getVideoPlayback(targetLesson.id)

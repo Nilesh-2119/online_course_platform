@@ -172,12 +172,16 @@ export interface AdminAnalyticsData {
   courseCompletion: MonthMetricPoint[]
   resourceDownloads: MonthMetricPoint[]
   couponEngagement: MonthMetricPoint[]
+  vslVideoViews: MonthMetricPoint[]
+  welcomeVideoViews: MonthMetricPoint[]
   totalActiveLearners: number
   totalFreeUsers: number
   totalEnrolledStudents: number
   totalCompletions: number
   totalResourceDownloads: number
   totalCouponUsages: number
+  totalVslViews: number
+  totalWelcomeVideoViews: number
 }
 
 /**

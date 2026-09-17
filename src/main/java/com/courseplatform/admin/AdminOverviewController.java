@@ -52,19 +52,22 @@ public class AdminOverviewController {
     private final VideoProgressRepository progressRepository;
     private final VideoRepository videoRepository;
     private final CouponUsageRepository couponUsageRepository;
+    private final com.courseplatform.video.VideoViewRepository videoViewRepository;
 
     public AdminOverviewController(UserRepository userRepository,
                                    CoursePurchaseRepository purchaseRepository,
                                    FreeResourceRepository resourceRepository,
                                    VideoProgressRepository progressRepository,
                                    VideoRepository videoRepository,
-                                   CouponUsageRepository couponUsageRepository) {
+                                   CouponUsageRepository couponUsageRepository,
+                                   com.courseplatform.video.VideoViewRepository videoViewRepository) {
         this.userRepository = userRepository;
         this.purchaseRepository = purchaseRepository;
         this.resourceRepository = resourceRepository;
         this.progressRepository = progressRepository;
         this.videoRepository = videoRepository;
         this.couponUsageRepository = couponUsageRepository;
+        this.videoViewRepository = videoViewRepository;
     }
 
     @GetMapping("/overview")
@@ -227,11 +230,34 @@ public class AdminOverviewController {
             realDownloadsByMonth.put(resYm, realDownloadsByMonth.getOrDefault(resYm, 0L) + count);
         }
 
+        // Video views mapped by month
+        List<com.courseplatform.video.VideoViewEntity> allVideoViews = videoViewRepository.findAll();
+        Map<YearMonth, Long> vslViewsByMonth = new HashMap<>();
+        Map<YearMonth, Long> welcomeViewsByMonth = new HashMap<>();
+        long totalVslViews = 0L;
+        long totalWelcomeViews = 0L;
+
+        for (com.courseplatform.video.VideoViewEntity vv : allVideoViews) {
+            String type = vv.getVideoType() != null ? vv.getVideoType().trim().toUpperCase() : "";
+            Instant vTime = vv.getViewedAt() != null ? vv.getViewedAt() : Instant.now();
+            YearMonth vYm = YearMonth.from(vTime.atZone(ZoneOffset.UTC));
+
+            if ("VSL".equals(type)) {
+                totalVslViews++;
+                vslViewsByMonth.put(vYm, vslViewsByMonth.getOrDefault(vYm, 0L) + 1);
+            } else if ("WELCOME".equals(type)) {
+                totalWelcomeViews++;
+                welcomeViewsByMonth.put(vYm, welcomeViewsByMonth.getOrDefault(vYm, 0L) + 1);
+            }
+        }
+
         List<AdminAnalyticsResponse.MonthMetricDto> activeLearnersList = new ArrayList<>();
         List<AdminAnalyticsResponse.FreeVsEnrolledDto> freeVsEnrolledList = new ArrayList<>();
         List<AdminAnalyticsResponse.MonthMetricDto> completionList = new ArrayList<>();
         List<AdminAnalyticsResponse.MonthMetricDto> downloadsList = new ArrayList<>();
         List<AdminAnalyticsResponse.MonthMetricDto> couponsList = new ArrayList<>();
+        List<AdminAnalyticsResponse.MonthMetricDto> vslList = new ArrayList<>();
+        List<AdminAnalyticsResponse.MonthMetricDto> welcomeList = new ArrayList<>();
 
         for (int idx = 0; idx < months.size(); idx++) {
             YearMonth ym = months.get(idx);
@@ -254,6 +280,12 @@ public class AdminOverviewController {
 
             long couponVal = couponPurchasesByMonth.getOrDefault(ym, 0L);
             couponsList.add(new AdminAnalyticsResponse.MonthMetricDto(monthKey, label, couponVal));
+
+            long vslVal = vslViewsByMonth.getOrDefault(ym, 0L);
+            vslList.add(new AdminAnalyticsResponse.MonthMetricDto(monthKey, label, vslVal));
+
+            long welcomeVal = welcomeViewsByMonth.getOrDefault(ym, 0L);
+            welcomeList.add(new AdminAnalyticsResponse.MonthMetricDto(monthKey, label, welcomeVal));
         }
 
         // Summary KPI totals directly from database records
@@ -270,12 +302,16 @@ public class AdminOverviewController {
                 completionList,
                 downloadsList,
                 couponsList,
+                vslList,
+                welcomeList,
                 totalActive,
                 totalFree,
                 totalEnrolled,
                 totalCompletions,
                 totalResourceDownloads,
-                totalCoupons
+                totalCoupons,
+                totalVslViews,
+                totalWelcomeViews
         );
 
         return ResponseEntity.ok(ApiResponse.success(response));

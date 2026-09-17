@@ -3,6 +3,7 @@
 import { AnimatePresence, motion } from "framer-motion"
 import { ArrowRight, Check, Play, Plus, X } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
+import { recordVideoView } from "@/lib/api/analytics-service"
 
 const reveal = { hidden: { opacity: 0, y: 18 }, visible: { opacity: 1, y: 0, transition: { duration: 0.5 } } }
 const learnItems = [["Hook Engineering", "Build openings that earn attention instead of asking for it."], ["Script Flow Rewrite", "Turn a list of features into a story people can follow."], ["High-Conversion CTAs", "Give viewers a clear reason to act."], ["Ad Strategy", "Make creative decisions support the campaign goal."]]
@@ -96,6 +97,15 @@ export function MediaFrame({
   const [dynamicPlayerUrl, setDynamicPlayerUrl] = useState<string | null>(null)
   const [loadingDynamicOtp, setLoadingDynamicOtp] = useState(false)
   const [otpError, setOtpError] = useState<string | null>(null)
+  const hasTrackedViewRef = useRef(false)
+
+  // Track VSL video watch in database
+  useEffect(() => {
+    if (isPlaying && !hasTrackedViewRef.current) {
+      hasTrackedViewRef.current = true
+      recordVideoView("VSL", "vsl-landing").catch(() => {})
+    }
+  }, [isPlaying])
 
   const parsed = parseVideoSource(videoUrl)
   const isVdoCipher = Boolean(videoUrl && videoUrl.includes("player.vdocipher.com"))

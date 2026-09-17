@@ -77,8 +77,9 @@ public class SecurityConfig {
                         // Public API endpoints
                         .requestMatchers("/api/v1/auth/**").permitAll()
                         .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
-                        // Webhooks & Sync
+                        // Webhooks & Sync & Analytics
                         .requestMatchers(HttpMethod.POST, "/api/v1/payments/webhook", "/api/v1/videos/webhook/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/analytics/video-view").permitAll()
                         .requestMatchers("/api/v1/videos/sync").permitAll()
                         // User progress & playback endpoints require authentication
                         .requestMatchers("/api/v1/courses/*/progress", "/api/v1/videos/*/progress", "/api/v1/videos/*/playback").authenticated()

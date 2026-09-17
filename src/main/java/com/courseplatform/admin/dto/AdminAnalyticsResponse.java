@@ -9,6 +9,8 @@ public class AdminAnalyticsResponse {
     private List<MonthMetricDto> courseCompletion;
     private List<MonthMetricDto> resourceDownloads;
     private List<MonthMetricDto> couponEngagement;
+    private List<MonthMetricDto> vslVideoViews;
+    private List<MonthMetricDto> welcomeVideoViews;
 
     private long totalActiveLearners;
     private long totalFreeUsers;
@@ -16,6 +18,8 @@ public class AdminAnalyticsResponse {
     private long totalCompletions;
     private long totalResourceDownloads;
     private long totalCouponUsages;
+    private long totalVslViews;
+    private long totalWelcomeVideoViews;
 
     public AdminAnalyticsResponse() {
     }
@@ -25,23 +29,31 @@ public class AdminAnalyticsResponse {
                                   List<MonthMetricDto> courseCompletion,
                                   List<MonthMetricDto> resourceDownloads,
                                   List<MonthMetricDto> couponEngagement,
+                                  List<MonthMetricDto> vslVideoViews,
+                                  List<MonthMetricDto> welcomeVideoViews,
                                   long totalActiveLearners,
                                   long totalFreeUsers,
                                   long totalEnrolledStudents,
                                   long totalCompletions,
                                   long totalResourceDownloads,
-                                  long totalCouponUsages) {
+                                  long totalCouponUsages,
+                                  long totalVslViews,
+                                  long totalWelcomeVideoViews) {
         this.activeLearners = activeLearners;
         this.freeVsEnrolled = freeVsEnrolled;
         this.courseCompletion = courseCompletion;
         this.resourceDownloads = resourceDownloads;
         this.couponEngagement = couponEngagement;
+        this.vslVideoViews = vslVideoViews;
+        this.welcomeVideoViews = welcomeVideoViews;
         this.totalActiveLearners = totalActiveLearners;
         this.totalFreeUsers = totalFreeUsers;
         this.totalEnrolledStudents = totalEnrolledStudents;
         this.totalCompletions = totalCompletions;
         this.totalResourceDownloads = totalResourceDownloads;
         this.totalCouponUsages = totalCouponUsages;
+        this.totalVslViews = totalVslViews;
+        this.totalWelcomeVideoViews = totalWelcomeVideoViews;
     }
 
     public List<MonthMetricDto> getActiveLearners() {
@@ -130,6 +142,38 @@ public class AdminAnalyticsResponse {
 
     public void setTotalCouponUsages(long totalCouponUsages) {
         this.totalCouponUsages = totalCouponUsages;
+    }
+
+    public List<MonthMetricDto> getVslVideoViews() {
+        return vslVideoViews;
+    }
+
+    public void setVslVideoViews(List<MonthMetricDto> vslVideoViews) {
+        this.vslVideoViews = vslVideoViews;
+    }
+
+    public List<MonthMetricDto> getWelcomeVideoViews() {
+        return welcomeVideoViews;
+    }
+
+    public void setWelcomeVideoViews(List<MonthMetricDto> welcomeVideoViews) {
+        this.welcomeVideoViews = welcomeVideoViews;
+    }
+
+    public long getTotalVslViews() {
+        return totalVslViews;
+    }
+
+    public void setTotalVslViews(long totalVslViews) {
+        this.totalVslViews = totalVslViews;
+    }
+
+    public long getTotalWelcomeVideoViews() {
+        return totalWelcomeVideoViews;
+    }
+
+    public void setTotalWelcomeVideoViews(long totalWelcomeVideoViews) {
+        this.totalWelcomeVideoViews = totalWelcomeVideoViews;
     }
 
     public static class MonthMetricDto {

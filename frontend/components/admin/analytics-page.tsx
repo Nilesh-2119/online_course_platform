@@ -10,6 +10,8 @@ import {
   Tag,
   RotateCw,
   AlertCircle,
+  Video,
+  Play,
 } from "lucide-react"
 import {
   getAdminAnalytics,
@@ -411,6 +413,22 @@ export function AdminAnalyticsPage() {
       color: "text-emerald-400",
     },
     {
+      label: "VSL VIDEO WATCHES",
+      value: data.totalVslViews || 0,
+      icon: Video,
+      description: "Landing page VSL views",
+      badge: "Top Funnel",
+      color: "text-amber-400",
+    },
+    {
+      label: "WELCOME VIDEO WATCHES",
+      value: data.totalWelcomeVideoViews || 0,
+      icon: Play,
+      description: "Dashboard overview views",
+      badge: "Orientation",
+      color: "text-violet-400",
+    },
+    {
       label: "RESOURCE DOWNLOADS",
       value: data.totalResourceDownloads,
       icon: Download,
@@ -441,7 +459,7 @@ export function AdminAnalyticsPage() {
             </span>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            Live database metrics for active learning, course progress, account acquisition, and promotional performance.
+            Live database metrics for active learning, video watch engagement, course progress, account acquisition, and promotional performance.
           </p>
         </div>
 
@@ -456,7 +474,7 @@ export function AdminAnalyticsPage() {
       </div>
 
       {/* KPI Highlights Bar */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {kpiItems.map((kpi) => {
           const Icon = kpi.icon
           return (
@@ -479,9 +497,29 @@ export function AdminAnalyticsPage() {
         })}
       </div>
 
-      {/* The 5 Month-Wise Charts Grid */}
+      {/* The Charts Grid */}
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* 1. ACTIVE LEARNERS */}
+        {/* 1. VSL VIDEO WATCHES */}
+        <MetricBarChart
+          title="VSL VIDEO WATCHES"
+          subtitle="Month-wise watch count of the homepage Video Sales Letter by prospective visitors."
+          data={data.vslVideoViews || []}
+          badgeText="Landing Page · Top Funnel"
+          accentColor="amber"
+          valueUnit="views"
+        />
+
+        {/* 2. WELCOME VIDEO WATCHES */}
+        <MetricBarChart
+          title="WELCOME VIDEO WATCHES"
+          subtitle="Month-wise watch count of the Student Dashboard Course Overview & Welcome video."
+          data={data.welcomeVideoViews || []}
+          badgeText="Dashboard · Onboarding"
+          accentColor="violet"
+          valueUnit="views"
+        />
+
+        {/* 3. ACTIVE LEARNERS */}
         <MetricBarChart
           title="ACTIVE LEARNERS"
           subtitle="Enrolled students who purchased the course and are actively learning (course not completed yet)."
@@ -491,10 +529,10 @@ export function AdminAnalyticsPage() {
           valueUnit="students"
         />
 
-        {/* 2. FREE VS ENROLLED STUDENTS */}
+        {/* 4. FREE VS ENROLLED STUDENTS */}
         <FreeVsEnrolledChart data={data.freeVsEnrolled} />
 
-        {/* 3. COURSE COMPLETION */}
+        {/* 5. COURSE COMPLETION */}
         <MetricBarChart
           title="COURSE COMPLETION"
           subtitle="Total students who completed 100% of all lessons in the course curriculum."
@@ -504,7 +542,7 @@ export function AdminAnalyticsPage() {
           valueUnit="completions"
         />
 
-        {/* 4. RESOURCE DOWNLOADS */}
+        {/* 6. RESOURCE DOWNLOADS */}
         <MetricBarChart
           title="RESOURCE DOWNLOADS"
           subtitle="Month-wise download frequency of free PDF guides, toolkits, and creative assets."
@@ -514,7 +552,7 @@ export function AdminAnalyticsPage() {
           valueUnit="downloads"
         />
 
-        {/* 5. COUPON ENGAGEMENT */}
+        {/* 7. COUPON ENGAGEMENT */}
         <div className="lg:col-span-2">
           <MetricBarChart
             title="COUPON ENGAGEMENT"
