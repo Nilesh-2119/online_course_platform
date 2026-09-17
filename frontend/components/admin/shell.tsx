@@ -3,13 +3,13 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useState, type ReactNode } from "react"
-import { BarChart3, FileText, Grid2X2, LogOut, Menu, Settings, Tag, Users, X } from "lucide-react"
+import { BarChart3, Bell, FileText, Grid2X2, LogOut, Menu, Settings, Tag, Users, X } from "lucide-react"
 import { adminNavItems, type AdminNavIcon } from "@/mocks/seed-data"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth"
 import { AdminGuard } from "./admin-guard"
 
-const icons: Record<AdminNavIcon, typeof Grid2X2> = { grid: Grid2X2, users: Users, file: FileText, tag: Tag, chart: BarChart3 }
+const icons: Record<AdminNavIcon, typeof Grid2X2> = { grid: Grid2X2, users: Users, file: FileText, tag: Tag, chart: BarChart3, bell: Bell }
 
 // ---------------------------------------------------------------------------
 // Sidebar

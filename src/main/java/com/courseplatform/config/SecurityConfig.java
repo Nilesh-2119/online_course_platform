@@ -86,7 +86,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/users/**", "/api/v1/payments/**").authenticated()
                         // Public catalog and free resources browsing
                         .requestMatchers(HttpMethod.GET, "/api/v1/courses", "/api/v1/courses/*", "/api/v1/courses/*/sections").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/sections/**", "/api/v1/resources/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/sections/**", "/api/v1/resources/**", "/api/v1/notifications/**").permitAll()
                         // All other endpoints require explicit authentication
                         .anyRequest().authenticated()
                 )

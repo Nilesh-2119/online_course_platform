@@ -33,47 +33,41 @@ import { mockCourses, mockLessons } from "@/mocks/seed-data"
 import { resourceService } from "@/lib/api"
 import { getCourseProgress, getCourseLessons, syncVdoCipherVideos, getVideoPlayback } from "@/lib/api/course-service"
 import { recordVideoView } from "@/lib/api/analytics-service"
-import type { CourseLesson, CourseProgress, FreeResource } from "@/lib/types"
+import { getActiveNotifications } from "@/lib/api/notification-service"
+import type { AppNotification, CourseLesson, CourseProgress, FreeResource } from "@/lib/types"
 
-interface NotificationItem {
-  id: string
-  title: string
-  message: string
-  date: string
-  tag: string
-  isNew?: boolean
-  icon: typeof Bell
+function getNotificationIcon(tag?: string) {
+  const t = (tag || "").toUpperCase()
+  if (t.includes("LIVE") || t.includes("EVENT") || t.includes("WORKSHOP")) {
+    return Flame
+  }
+  if (t.includes("RESOURCE")) {
+    return Sparkles
+  }
+  if (t.includes("UPDATE")) {
+    return Zap
+  }
+  return Bell
 }
 
-const NOTIFICATIONS: NotificationItem[] = [
-  {
-    id: "notif-1",
-    title: "Live Creative Workshop",
-    message: "Join the live breakdown session this Saturday at 6:00 PM IST with Q&A.",
-    date: "Today, 11:30 AM",
-    tag: "LIVE EVENT",
-    isNew: true,
-    icon: Flame,
-  },
-  {
-    id: "notif-2",
-    title: "New Resource Added",
-    message: "The 2026 Ad Hook Swipe File & Script Template has been added to Free Resources.",
-    date: "Yesterday",
-    tag: "RESOURCE",
-    isNew: false,
-    icon: Sparkles,
-  },
-  {
-    id: "notif-3",
-    title: "Course System Updated",
-    message: "Fast 1080p adaptive bitrate streaming is now enabled for all course videos.",
-    date: "2 days ago",
-    tag: "UPDATE",
-    isNew: false,
-    icon: Zap,
-  },
-]
+function formatNotificationDate(dateStr?: string): string {
+  if (!dateStr) return ""
+  try {
+    const d = new Date(dateStr)
+    const now = new Date()
+    const diffMs = now.getTime() - d.getTime()
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+    const diffDays = Math.floor(diffHours / 24)
+
+    if (diffHours < 1) return "Just now"
+    if (diffHours < 24) return `${diffHours}h ago`
+    if (diffDays === 1) return "Yesterday"
+    if (diffDays < 7) return `${diffDays}d ago`
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+  } catch (e) {
+    return dateStr
+  }
+}
 
 export function DashboardView() {
   const { user, logout } = useAuth()
@@ -94,6 +88,8 @@ export function DashboardView() {
   const [loadingResources, setLoadingResources] = useState(true)
   const [isSyncing, setIsSyncing] = useState(false)
   const [dbResources, setDbResources] = useState<FreeResource[]>([])
+  const [notifications, setNotifications] = useState<AppNotification[]>([])
+  const [loadingNotifications, setLoadingNotifications] = useState(true)
 
   // Inline Welcome Video Playback State
   const [isPlayingWelcome, setIsPlayingWelcome] = useState(false)
@@ -106,10 +102,11 @@ export function DashboardView() {
 
   const loadData = async () => {
     try {
-      const [progressRes, lessonsRes, resourcesRes] = await Promise.all([
+      const [progressRes, lessonsRes, resourcesRes, notificationsRes] = await Promise.all([
         getCourseProgress("1"),
         getCourseLessons("1"),
         resourceService.getResources(),
+        getActiveNotifications(),
       ])
 
       if (progressRes.success && progressRes.data) {
@@ -121,11 +118,15 @@ export function DashboardView() {
       if (resourcesRes.success && Array.isArray(resourcesRes.data)) {
         setDbResources(resourcesRes.data)
       }
+      if (notificationsRes.success && Array.isArray(notificationsRes.data)) {
+        setNotifications(notificationsRes.data)
+      }
     } catch (err) {
       console.error("Failed to load dashboard course data:", err)
     } finally {
       setLoadingLessons(false)
       setLoadingResources(false)
+      setLoadingNotifications(false)
     }
   }
 
@@ -523,38 +524,60 @@ export function DashboardView() {
                   </div>
 
                   <div className="mt-4 flex-1 divide-y divide-border/60">
-                    {NOTIFICATIONS.map((notif) => {
-                      const Icon = notif.icon
-                      return (
-                        <div key={notif.id} className="py-3.5 first:pt-0 last:pb-0">
-                          <div className="flex items-start gap-3">
-                            <div className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-xl bg-[#f5f4ef] border border-border">
-                              <Icon className="size-4 text-foreground" />
-                            </div>
-                            <div className="min-w-0 flex-1 space-y-1">
-                              <div className="flex items-center justify-between gap-2">
-                                <p className="truncate text-xs font-black tracking-tight">{notif.title}</p>
-                                {notif.isNew && (
-                                  <span className="rounded-full bg-accent px-1.5 py-0.5 font-mono text-[8px] font-black text-accent-foreground">
-                                    NEW
-                                  </span>
-                                )}
+                    {loadingNotifications ? (
+                      <div className="py-8 text-center text-xs font-mono text-muted-foreground animate-pulse">
+                        Loading announcements...
+                      </div>
+                    ) : notifications.length === 0 ? (
+                      <div className="py-8 text-center text-xs font-mono text-muted-foreground">
+                        No announcements at this time.
+                      </div>
+                    ) : (
+                      notifications.map((notif) => {
+                        const Icon = getNotificationIcon(notif.tag)
+                        return (
+                          <div key={notif.id} className="py-3.5 first:pt-0 last:pb-0">
+                            <div className="flex items-start gap-3">
+                              <div className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-xl bg-[#f5f4ef] border border-border">
+                                <Icon className="size-4 text-foreground" />
                               </div>
-                              <p className="font-mono text-[11px] leading-relaxed text-muted-foreground">
-                                {notif.message}
-                              </p>
-                              <p className="font-mono text-[9px] text-muted-foreground/80">{notif.date}</p>
+                              <div className="min-w-0 flex-1 space-y-1">
+                                <div className="flex items-center justify-between gap-2">
+                                  <p className="truncate text-xs font-black tracking-tight">{notif.title}</p>
+                                  {notif.isNew && (
+                                    <span className="rounded-full bg-accent px-1.5 py-0.5 font-mono text-[8px] font-black text-accent-foreground">
+                                      NEW
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="font-mono text-[11px] leading-relaxed text-muted-foreground">
+                                  {notif.message}
+                                </p>
+                                <div className="flex items-center justify-between gap-2 pt-0.5 font-mono text-[9px] text-muted-foreground/80">
+                                  <span>{formatNotificationDate(notif.createdAt)}</span>
+                                  {notif.linkUrl && (
+                                    <a
+                                      href={notif.linkUrl}
+                                      target={notif.linkUrl.startsWith("http") ? "_blank" : "_self"}
+                                      rel="noopener noreferrer"
+                                      className="text-accent hover:underline font-semibold"
+                                    >
+                                      Open →
+                                    </a>
+                                  )}
+                                </div>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      )
-                    })}
+                        )
+                      })
+                    )}
                   </div>
 
                   <div className="mt-4 pt-3 border-t border-border">
                     <div className="flex items-center justify-between text-muted-foreground font-mono text-[10px]">
                       <span>All updates synced</span>
-                      <span className="text-foreground font-semibold">3 Total</span>
+                      <span className="text-foreground font-semibold">{notifications.length} Total</span>
                     </div>
                   </div>
                 </div>

@@ -157,6 +157,7 @@ export const adminNavItems = [
   { label: "FREE RESOURCES", href: "/admin/resources", icon: "file" as const },
   { label: "COUPONS", href: "/admin/coupons", icon: "tag" as const },
   { label: "ANALYTICS", href: "/admin/analytics", icon: "chart" as const },
+  { label: "NOTIFICATIONS", href: "/admin/notifications", icon: "bell" as const },
 ]
 
 export type AdminNavIcon = typeof adminNavItems[number]["icon"]
