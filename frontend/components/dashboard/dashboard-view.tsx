@@ -31,7 +31,7 @@ import { useAuth } from "@/lib/auth"
 import { formatCurrency, cn } from "@/lib/utils"
 import { mockCourses, mockLessons } from "@/mocks/seed-data"
 import { resourceService } from "@/lib/api"
-import { getCourseProgress, getCourseLessons, syncVdoCipherVideos } from "@/lib/api/course-service"
+import { getCourseProgress, getCourseLessons, syncVdoCipherVideos, getVideoPlayback } from "@/lib/api/course-service"
 import type { CourseLesson, CourseProgress, FreeResource } from "@/lib/types"
 
 interface NotificationItem {
@@ -93,6 +93,12 @@ export function DashboardView() {
   const [loadingResources, setLoadingResources] = useState(true)
   const [isSyncing, setIsSyncing] = useState(false)
   const [dbResources, setDbResources] = useState<FreeResource[]>([])
+
+  // Inline Welcome Video Playback State
+  const [isPlayingWelcome, setIsPlayingWelcome] = useState(false)
+  const [welcomePlayback, setWelcomePlayback] = useState<{ otp: string; playbackInfo: string } | null>(null)
+  const [welcomePlaybackLoading, setWelcomePlaybackLoading] = useState(false)
+  const [welcomePlaybackError, setWelcomePlaybackError] = useState<string | null>(null)
 
   const isPurchased = user?.type === "paid" || Boolean((user as any)?.coursePurchased)
   const course = mockCourses[0]
@@ -191,12 +197,39 @@ export function DashboardView() {
       l.title?.toLowerCase().includes("intro")
   ) || lessons[0]
 
-  const overviewHref = `/dashboard/course/${welcomeLesson?.id || lessons[0]?.id || "1"}`
+  const handlePlayWelcome = async () => {
+    setIsPlayingWelcome(true)
+    if (welcomePlayback && !welcomePlaybackError) return
+
+    const targetLesson = welcomeLesson || lessons[0]
+    if (!targetLesson?.id) {
+      setWelcomePlaybackError("No course video found. Please refresh or try again.")
+      return
+    }
+
+    setWelcomePlaybackLoading(true)
+    setWelcomePlaybackError(null)
+
+    try {
+      const res = await getVideoPlayback(targetLesson.id)
+      if (res.success && res.data?.otp && res.data?.playbackInfo) {
+        setWelcomePlayback({
+          otp: res.data.otp,
+          playbackInfo: res.data.playbackInfo,
+        })
+      } else {
+        setWelcomePlaybackError(res.error || "Failed to load secure video playback.")
+      }
+    } catch (err: any) {
+      setWelcomePlaybackError(err?.message || "An unexpected error occurred while loading video stream.")
+    } finally {
+      setWelcomePlaybackLoading(false)
+    }
+  }
+
   const activeLesson = lessons.find((l) => String(l.id) === String(progress.currentLessonId)) || lessons[0]
   const completedCount = progress.completedLessons || (isPurchased ? 1 : 0)
   const totalCount = lessons.length || progress.totalLessons || 4
-
-  const resumeHref = `/dashboard/course/${activeLesson?.id || "1"}`
 
   return (
     <main className="min-h-screen bg-[#f5f4ef] text-foreground font-sans antialiased selection:bg-accent selection:text-accent-foreground">
@@ -372,28 +405,68 @@ export function DashboardView() {
                       </span>
                     </div>
 
-                    <div className="mt-5 group relative aspect-video overflow-hidden rounded-2xl border border-border bg-foreground">
-                      <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(204,255,0,.25),transparent_70%)]" />
-                      <div className="absolute left-4 top-4 font-mono text-xs font-bold text-accent">
-                        COURSE OVERVIEW
-                      </div>
+                    <div className="mt-5 group relative aspect-video overflow-hidden rounded-2xl border border-border bg-black">
+                      {isPlayingWelcome ? (
+                        welcomePlaybackLoading ? (
+                          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black text-white">
+                            <Loader2 className="size-8 animate-spin text-accent" />
+                            <p className="font-mono text-xs uppercase tracking-widest text-accent">Initializing Stream</p>
+                            <p className="text-[11px] text-white/60">Generating secure playback...</p>
+                          </div>
+                        ) : welcomePlaybackError ? (
+                          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black p-6 text-center text-white">
+                            <ShieldAlert className="size-9 text-destructive" />
+                            <p className="font-mono text-xs text-white/80">{welcomePlaybackError}</p>
+                            <button
+                              type="button"
+                              onClick={handlePlayWelcome}
+                              className="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2 font-mono text-xs font-bold text-accent-foreground cursor-pointer"
+                            >
+                              <RefreshCw className="size-3.5" /> Retry Playback
+                            </button>
+                          </div>
+                        ) : welcomePlayback ? (
+                          <iframe
+                            src={`https://player.vdocipher.com/v2/?otp=${encodeURIComponent(welcomePlayback.otp)}&playbackInfo=${encodeURIComponent(welcomePlayback.playbackInfo)}&autoplay=true`}
+                            className="absolute inset-0 size-full border-0"
+                            allow="encrypted-media; autoplay; fullscreen; picture-in-picture"
+                            allowFullScreen
+                            title={welcomeLesson?.title || "Welcome Video"}
+                          />
+                        ) : null
+                      ) : (
+                        <div
+                          onClick={handlePlayWelcome}
+                          className="absolute inset-0 cursor-pointer"
+                        >
+                          <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(204,255,0,.25),transparent_70%)]" />
+                          <div className="absolute left-4 top-4 font-mono text-xs font-bold text-accent">
+                            COURSE OVERVIEW
+                          </div>
 
-                      {/* Play Button Overlay */}
-                      <Link
-                        href={overviewHref}
-                        className="absolute inset-0 m-auto grid size-14 place-items-center rounded-full border border-accent bg-accent text-accent-foreground shadow-lg transition-transform group-hover:scale-110 active:scale-95"
-                      >
-                        <Play className="size-6 fill-current ml-1" />
-                      </Link>
+                          {/* Play Button Overlay */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handlePlayWelcome()
+                            }}
+                            className="absolute inset-0 m-auto grid size-14 place-items-center rounded-full border border-accent bg-accent text-accent-foreground shadow-lg transition-transform group-hover:scale-110 active:scale-95 cursor-pointer"
+                            aria-label="Play welcome video"
+                          >
+                            <Play className="size-6 fill-current ml-1" />
+                          </button>
 
-                      <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between text-background font-mono text-[11px]">
-                        <span className="rounded-md bg-black/60 px-2 py-1 backdrop-blur font-bold">
-                          {welcomeLesson?.title || "Welcome to AdFix Masterclass"}
-                        </span>
-                        <span className="rounded-md bg-black/60 px-2 py-1 backdrop-blur">
-                          {welcomeLesson?.duration ? `${Math.floor(welcomeLesson.duration / 60)} mins` : "Overview"}
-                        </span>
-                      </div>
+                          <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between text-background font-mono text-[11px]">
+                            <span className="rounded-md bg-black/60 px-2 py-1 backdrop-blur font-bold">
+                              {welcomeLesson?.title || "Welcome to AdFix Masterclass"}
+                            </span>
+                            <span className="rounded-md bg-black/60 px-2 py-1 backdrop-blur">
+                              {welcomeLesson?.duration ? `${Math.floor(welcomeLesson.duration / 60)} mins` : "Overview"}
+                            </span>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     <h3 className="mt-4 text-xl font-black tracking-tight">
@@ -405,15 +478,31 @@ export function DashboardView() {
                   </div>
 
                   <div className="mt-6 pt-4 border-t border-border flex items-center justify-between">
-                    <Link
-                      href={overviewHref}
-                      className="inline-flex items-center gap-2 rounded-full bg-foreground px-5 py-2.5 font-mono text-xs font-bold text-background transition-transform hover:scale-[1.02] active:scale-95"
-                    >
-                      <Play className="size-3.5 fill-current text-accent" /> WATCH COURSE OVERVIEW
-                    </Link>
+                    {isPlayingWelcome ? (
+                      <div className="flex items-center gap-3">
+                        <div className="inline-flex items-center gap-2 rounded-full bg-accent/20 px-4 py-2 font-mono text-xs font-bold text-accent-foreground">
+                          <span className="size-2 rounded-full bg-accent animate-pulse" /> NOW PLAYING
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setIsPlayingWelcome(false)}
+                          className="font-mono text-xs text-muted-foreground hover:text-foreground underline underline-offset-4 cursor-pointer"
+                        >
+                          Close Player
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handlePlayWelcome}
+                        className="inline-flex items-center gap-2 rounded-full bg-foreground px-5 py-2.5 font-mono text-xs font-bold text-background transition-transform hover:scale-[1.02] active:scale-95 cursor-pointer"
+                      >
+                        <Play className="size-3.5 fill-current text-accent" /> WATCH COURSE OVERVIEW
+                      </button>
+                    )}
                     <button
                       onClick={() => setSection("courses")}
-                      className="font-mono text-xs text-muted-foreground hover:text-foreground underline underline-offset-4"
+                      className="font-mono text-xs text-muted-foreground hover:text-foreground underline underline-offset-4 cursor-pointer"
                     >
                       View All Lessons →
                     </button>
