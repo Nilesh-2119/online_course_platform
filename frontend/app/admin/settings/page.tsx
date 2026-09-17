@@ -1,10 +1,5 @@
-import { AdminShell } from "@/components/admin/shell"
-import { AdminSettingsPage } from "@/components/admin/settings-page"
+import { redirect } from "next/navigation"
 
 export default function Page() {
-  return (
-    <AdminShell title="SETTINGS">
-      <AdminSettingsPage />
-    </AdminShell>
-  )
+  redirect("/admin")
 }

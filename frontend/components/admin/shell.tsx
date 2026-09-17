@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useState, type ReactNode } from "react"
-import { BarChart3, Bell, FileText, Grid2X2, LogOut, Menu, Settings, Tag, Users, X } from "lucide-react"
+import { BarChart3, Bell, FileText, Grid2X2, LogOut, Menu, Tag, Users, X } from "lucide-react"
 import { adminNavItems, type AdminNavIcon } from "@/mocks/seed-data"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth"
@@ -37,9 +37,6 @@ function Sidebar({ mobile = false, onClose }: { mobile?: boolean; onClose?: () =
           })}
         </nav>
         <div className="mt-auto flex flex-col gap-1 border-t border-border pt-5">
-          <Link onClick={onClose} href="/admin/settings" className="flex items-center gap-3 rounded-md px-3 py-3 font-mono text-[11px] tracking-[.12em] text-muted-foreground hover:bg-muted hover:text-foreground">
-            <Settings size={16} />SETTINGS
-          </Link>
           <button
             onClick={() => {
               logout()
