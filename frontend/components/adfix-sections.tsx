@@ -11,11 +11,178 @@ const problems = [["The 3-Second Drop-off", "Your opening hook lacks the pattern
 const faqs = [["Who is AdFix for?", "AdFix is for creators, freelancers, marketers, founders, small businesses and agencies making ads or content for their own work or clients."], ["Is the course live or recorded?", "The course is a recorded video course."], ["What will I learn?", "You will learn hook engineering, script flow rewrite, high-conversion CTAs and ad strategy."], ["How do I get access after purchasing?", "Access details will be provided when the purchase flow is confirmed."]]
 const openPurchase = () => { window.location.href = "/buy" }
 
-function MediaFrame({ label = "CREATIVE PREVIEW" }: { label?: string }) { return <div className="group relative aspect-video overflow-hidden rounded-3xl border border-foreground/15 bg-foreground text-background shadow-xl"><div className="absolute inset-y-0 right-0 w-1/2 bg-[linear-gradient(135deg,rgba(204,255,0,.18),transparent_45%,rgba(255,255,255,.08))]" /><div className="absolute left-5 right-5 top-5 flex justify-between font-mono text-[9px] tracking-[.2em] text-background/50"><span>ADFIX / {label}</span><span>00:00</span></div><button aria-label={`Play ${label}`} className="absolute left-1/2 top-1/2 flex size-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-accent text-accent-foreground transition-transform group-hover:scale-105"><Play className="ml-1 size-6 fill-current" /></button><div className="absolute bottom-5 left-5 right-5 flex items-center gap-3"><span className="h-px flex-1 bg-background/25" /><span className="font-mono text-[9px] tracking-widest text-background/50">PLAY / 16:9</span></div></div> }
+/**
+ * VSL (Video Sales Letter) Video Configuration
+ * --------------------------------------------
+ * Set your video link here or via the NEXT_PUBLIC_VSL_VIDEO_URL environment variable.
+ * Supported formats:
+ * - YouTube: "https://www.youtube.com/watch?v=VIDEO_ID" or "https://youtu.be/VIDEO_ID"
+ * - Vimeo: "https://vimeo.com/VIDEO_ID"
+ * - Direct MP4: "/vsl.mp4" (put the file in the frontend/public folder) or "https://cdn.example.com/vsl.mp4"
+ * - Custom Embed / VdoCipher: Any embed URL (e.g. "https://player.vdocipher.com/...")
+ */
+export const VSL_VIDEO_CONFIG = {
+  url: process.env.NEXT_PUBLIC_VSL_VIDEO_URL || "https://player.vdocipher.com/v2/?otp=20160313versASE32326WaBWp4CW6waHTMrhIRUaFDF7Inc3qbstq3xDO7avEwSH&playbackInfo=eyJ2aWRlb0lkIjoiZjQyNjVlZGRmODMzNGRmYjk4ZDJhMzQzMDZhMjZkNjUifQ==",
+  duration: "10:00",
+}
+
+function parseVideoSource(rawUrl?: string) {
+  if (!rawUrl) return null
+  const cleanUrl = rawUrl.trim()
+  if (!cleanUrl) return null
+
+  // YouTube match: watch?v=, youtu.be/, embed/, shorts/
+  const ytMatch = cleanUrl.match(
+    /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=|shorts\/)|youtu\.be\/)([^"&?\/\s]{11})/i
+  )
+  if (ytMatch && ytMatch[1]) {
+    return {
+      type: "iframe" as const,
+      src: `https://www.youtube-nocookie.com/embed/${ytMatch[1]}?autoplay=1&rel=0&modestbranding=1`,
+    }
+  }
+
+  // Vimeo match
+  const vimeoMatch = cleanUrl.match(
+    /(?:vimeo\.com\/(?:channels\/(?:\w+\/)?|groups\/[^\/]*\/videos\/|album\/(?:\d+\/)?video\/|video\/|)|player\.vimeo\.com\/video\/)(\d+)/i
+  )
+  if (vimeoMatch && vimeoMatch[1]) {
+    return {
+      type: "iframe" as const,
+      src: `https://player.vimeo.com/video/${vimeoMatch[1]}?autoplay=1&badge=0`,
+    }
+  }
+
+  // Direct MP4 / WebM video file
+  if (cleanUrl.match(/\.(mp4|webm|ogg|m4v)(\?.*)?$/i) || cleanUrl.startsWith("/")) {
+    return {
+      type: "video" as const,
+      src: cleanUrl,
+    }
+  }
+
+  // Default fallback iframe (VdoCipher or embed URL)
+  return {
+    type: "iframe" as const,
+    src: cleanUrl,
+  }
+}
+
+export function MediaFrame({
+  label = "CREATIVE PREVIEW",
+  videoUrl = VSL_VIDEO_CONFIG.url,
+  duration = VSL_VIDEO_CONFIG.duration,
+}: {
+  label?: string
+  videoUrl?: string
+  duration?: string
+}) {
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [showSetupGuide, setShowSetupGuide] = useState(false)
+  const parsed = parseVideoSource(videoUrl)
+
+  if (isPlaying && parsed) {
+    return (
+      <div className="group relative aspect-video w-full overflow-hidden rounded-3xl border border-foreground/15 bg-black text-background shadow-2xl">
+        {parsed.type === "iframe" ? (
+          <iframe
+            src={parsed.src}
+            title={label}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowFullScreen
+            className="h-full w-full border-0"
+          />
+        ) : (
+          <video
+            src={parsed.src}
+            controls
+            autoPlay
+            playsInline
+            className="h-full w-full object-contain"
+          />
+        )}
+        <button
+          type="button"
+          onClick={() => setIsPlaying(false)}
+          aria-label="Close video"
+          className="absolute right-4 top-4 z-20 flex size-9 items-center justify-center rounded-full bg-background/80 text-foreground shadow-md backdrop-blur-sm transition-transform hover:scale-110 hover:bg-background"
+        >
+          <X className="size-5" />
+        </button>
+      </div>
+    )
+  }
+
+  if (showSetupGuide && !parsed) {
+    return (
+      <div className="relative aspect-video w-full overflow-hidden rounded-3xl border border-accent/40 bg-foreground p-6 text-background shadow-2xl flex flex-col justify-between">
+        <div className="flex items-center justify-between">
+          <span className="font-mono text-[10px] tracking-widest text-accent">VSL VIDEO SETUP GUIDE</span>
+          <button
+            type="button"
+            onClick={() => setShowSetupGuide(false)}
+            aria-label="Close setup guide"
+            className="rounded-full border border-background/20 p-1 hover:bg-background/10"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+        <div>
+          <h3 className="text-xl font-black tracking-tight">How to set your VSL Video:</h3>
+          <ul className="mt-2 space-y-1.5 font-mono text-xs text-background/70">
+            <li>• <strong>YouTube:</strong> Paste your YouTube link (e.g. <span className="text-accent">https://youtu.be/...</span>)</li>
+            <li>• <strong>Vimeo:</strong> Paste your Vimeo link (e.g. <span className="text-accent">https://vimeo.com/...</span>)</li>
+            <li>• <strong>Direct MP4:</strong> Put file in <span className="text-accent">frontend/public/vsl.mp4</span> and set url to <span className="text-accent">/vsl.mp4</span></li>
+          </ul>
+          <p className="mt-3 font-mono text-[11px] text-background/50">
+            Open <span className="text-accent">frontend/components/adfix-sections.tsx</span> and set <span className="text-accent">VSL_VIDEO_CONFIG.url</span>, or add <span className="text-accent">NEXT_PUBLIC_VSL_VIDEO_URL</span> to your <span className="text-accent">.env</span>.
+          </p>
+        </div>
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={() => setShowSetupGuide(false)}
+            className="rounded-full bg-accent px-4 py-1.5 font-mono text-xs font-bold text-accent-foreground"
+          >
+            Got it
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="group relative aspect-video overflow-hidden rounded-3xl border border-foreground/15 bg-foreground text-background shadow-xl">
+      <div className="absolute inset-y-0 right-0 w-1/2 bg-[linear-gradient(135deg,rgba(204,255,0,.18),transparent_45%,rgba(255,255,255,.08))]" />
+      <div className="absolute left-5 right-5 top-5 flex justify-between font-mono text-[9px] tracking-[.2em] text-background/50">
+        <span>ADFIX / {label}</span>
+        <span>{duration || "00:00"}</span>
+      </div>
+      <button
+        type="button"
+        onClick={() => {
+          if (parsed) {
+            setIsPlaying(true)
+          } else {
+            setShowSetupGuide(true)
+          }
+        }}
+        aria-label={`Play ${label}`}
+        className="absolute left-1/2 top-1/2 flex size-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-accent text-accent-foreground shadow-lg transition-transform group-hover:scale-110 active:scale-95"
+      >
+        <Play className="ml-1 size-6 fill-current" />
+      </button>
+      <div className="absolute bottom-5 left-5 right-5 flex items-center gap-3">
+        <span className="h-px flex-1 bg-background/25" />
+        <span className="font-mono text-[9px] tracking-widest text-background/50">PLAY / 16:9</span>
+      </div>
+    </div>
+  )
+}
 
 export function AdfixHero() { return <section id="hero" className="relative flex min-h-[calc(100svh-1rem)] items-center overflow-hidden bg-background px-5 pb-12 pt-28 noise-overlay md:h-svh md:px-8"><div className="mx-auto grid w-full max-w-7xl items-center gap-10 lg:grid-cols-[1.08fr_.92fr] lg:gap-14"><motion.div initial="hidden" animate="visible" variants={reveal}><span className="inline-flex items-center gap-2 rounded-full bg-foreground px-3 py-1.5 font-mono text-[10px] tracking-[.2em] text-background"><span className="size-1.5 rounded-full bg-accent" />AD CREATIVE EDUCATION</span><h1 className="mt-7 max-w-4xl text-balance text-[2.7rem] font-black leading-[.94] tracking-[-.07em] min-[360px]:text-[2.85rem] min-[390px]:text-5xl sm:mt-5 sm:text-6xl lg:text-7xl">Turn your average ad into a <span className="text-accent">high-performing story.</span></h1><p className="mt-5 max-w-xl text-pretty font-mono text-sm leading-6 text-muted-foreground md:text-base">We help creators and brands make their ads <strong>scroll-stopping</strong>, <strong>engaging</strong>, and <strong>profitable</strong> through better hooks, scripts, storytelling, and CTA strategy.</p><div className="mt-5 flex flex-wrap gap-2">{["Hook Engineering", "Script Flow Rewrite", "High-Conversion CTAs", "Ad Strategy"].map(tag => <span key={tag} className="rounded-full border border-border px-3 py-1.5 font-mono text-[10px] text-muted-foreground">{tag}</span>)}</div><div className="mt-7 flex flex-col gap-3 sm:flex-row"><button onClick={openPurchase} className="inline-flex items-center justify-center gap-3 rounded-full bg-accent px-6 py-3.5 text-sm font-bold text-accent-foreground">GET INSTANT ACCESS <ArrowRight className="size-4" /></button><a href="#vsl" className="inline-flex items-center justify-center gap-3 rounded-full border-2 border-foreground px-6 py-3.5 text-sm font-bold">WATCH THE VSL <Play className="size-4 fill-current" /></a></div></motion.div><motion.div initial="hidden" animate="visible" variants={reveal} className="relative hidden min-h-[420px] items-center justify-center lg:flex"><div className="absolute right-8 top-4 font-mono text-xs tracking-[.25em] text-muted-foreground"></div><div className="rotate-[-5deg] rounded-[2rem] border border-foreground/10 bg-foreground p-8 text-background shadow-2xl"><p className="font-mono text-xs text-accent">MAKE IT LAND</p><p className="mt-12 max-w-xs text-6xl font-black leading-[.8] tracking-[-.08em]">THE<br />ADFIX<br /><span className="text-accent">METHOD</span></p><p className="mt-16 font-mono text-xs leading-5 text-background/60">Make people stop.<br />Make them care.<br />Make them act.<br /><span className="text-accent">HOOK → STORY → CTA</span></p></div></motion.div></div></section> }
 
-export function VslSection() { return <section id="vsl" className="bg-foreground px-5 py-16 text-background md:px-8 md:py-20"><div className="mx-auto max-w-5xl"><motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={reveal}><p className="font-mono text-[10px] tracking-[.25em] text-accent">WATCH BEFORE YOU DECIDE</p><h2 className="mt-2 text-4xl font-black leading-none tracking-[-.06em] md:text-6xl">Before you buy, see how AdFix thinks.</h2><p className="mt-3 max-w-xl font-mono text-xs leading-5 text-background/60">See how we approach hooks, scripts, storytelling and CTAs before deciding if the course is right for you.</p></motion.div><div className="mt-8 max-w-2xl"><MediaFrame label="VSL / WATCH THE FRAMEWORK" /></div></div></section> }
+export function VslSection({ videoUrl, duration }: { videoUrl?: string; duration?: string }) { return <section id="vsl" className="bg-foreground px-5 py-16 text-background md:px-8 md:py-20"><div className="mx-auto max-w-5xl"><motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={reveal}><p className="font-mono text-[10px] tracking-[.25em] text-accent">WATCH BEFORE YOU DECIDE</p><h2 className="mt-2 text-4xl font-black leading-none tracking-[-.06em] md:text-6xl">Before you buy, see how AdFix thinks.</h2><p className="mt-3 max-w-xl font-mono text-xs leading-5 text-background/60">See how we approach hooks, scripts, storytelling and CTAs before deciding if the course is right for you.</p></motion.div><div className="mt-8 max-w-2xl"><MediaFrame label="VSL / WATCH THE FRAMEWORK" videoUrl={videoUrl} duration={duration} /></div></div></section> }
 
 const examples = [{ before: "#1 BEFORE — COMMON BORING AD LINE", beforeText: "Society me gym, pool aur 24 ghante security hai ...", after: "AFTER — LUXURY, VISUAL, “WOW” FEEL", afterText: "Yeh simple pool nahi - rooftop infinity pool hai, jahan sunset ke saath-saath aapka stress bhi doob jaata hai. Aur gym? Sirf naam ka nahi. Yahan 6 personal-training stations hain, taaki aapko kabhi wait na karna pade." }, { before: "#2 BEFORE - WEAK, ROBOTIC LINE", beforeText: "Yeh moisturizer skin ko soft banata hai. Abhi buy karein.", after: "AFTER - BENEFIT-DRIVEN & ENGAGING", afterText: "Soft skin nahi ... yeh woh glow deta hai jisse log poochte hain - 'Skincare routine kya hai?' Lightweight, non-sticky aur sirf 7 din me visible result. Bas face wash, apply - aur skin fresh, without extra effort." }, { before: "#3 BEFORE - GENERIC GYM LINE", beforeText: "Humaray gym me modern machines aur certified trainers milte hain.", after: "AFTER - EMOTION & ACCOUNTABILITY", afterText: "Machines toh sabke paas hoti hain ... par yahan aapko milta hai woh personal push jo aapka 'kal se karunga' ko 'aaj se start' me badal deta hai. Aapka goal, humari accountability." }]
 function Example({ item, index }: { item: typeof examples[number]; index: number }) { return <article className="grid gap-5 border-t border-border py-8"><div className="flex flex-col gap-6"><div><p className="font-mono text-[10px] tracking-[.15em] text-muted-foreground">{item.before}</p><p className="mt-2 text-xl font-bold leading-6">“{item.beforeText}”</p></div><div><p className="font-mono text-[10px] tracking-[.15em] text-foreground">{item.after}</p><p className="mt-2 text-xl font-bold leading-6">“{item.afterText}”</p></div></div></article> }
