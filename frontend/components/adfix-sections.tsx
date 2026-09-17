@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion"
 import { ArrowRight, Check, Play, Plus, X } from "lucide-react"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
 const reveal = { hidden: { opacity: 0, y: 18 }, visible: { opacity: 1, y: 0, transition: { duration: 0.5 } } }
 const learnItems = [["Hook Engineering", "Build openings that earn attention instead of asking for it."], ["Script Flow Rewrite", "Turn a list of features into a story people can follow."], ["High-Conversion CTAs", "Give viewers a clear reason to act."], ["Ad Strategy", "Make creative decisions support the campaign goal."]]
@@ -22,7 +22,7 @@ const openPurchase = () => { window.location.href = "/buy" }
  * - Custom Embed / VdoCipher: Any embed URL (e.g. "https://player.vdocipher.com/...")
  */
 export const VSL_VIDEO_CONFIG = {
-  url: process.env.NEXT_PUBLIC_VSL_VIDEO_URL || "https://player.vdocipher.com/v2/?otp=20160313versASE32326WaBWp4CW6waHTMrhIRUaFDF7Inc3qbstq3xDO7avEwSH&playbackInfo=eyJ2aWRlb0lkIjoiZjQyNjVlZGRmODMzNGRmYjk4ZDJhMzQzMDZhMjZkNjUifQ==",
+  url: process.env.NEXT_PUBLIC_VSL_VIDEO_URL || "https://player.vdocipher.com/v2/?otp=20160313versASE3232llT7PwvAw9U5GcsxgNnwJlncTMl8mLnwYtrMptOZOOCYx&playbackInfo=eyJ2aWRlb0lkIjoiZjQyNjVlZGRmODMzNGRmYjk4ZDJhMzQzMDZhMjZkNjUifQ==",
   duration: "10:00",
 }
 
@@ -30,6 +30,18 @@ function parseVideoSource(rawUrl?: string) {
   if (!rawUrl) return null
   const cleanUrl = rawUrl.trim()
   if (!cleanUrl) return null
+
+  // VdoCipher embed (ensure autoplay=true is included so it plays immediately)
+  if (cleanUrl.includes("player.vdocipher.com")) {
+    let vdoUrl = cleanUrl
+    if (!vdoUrl.includes("autoplay=")) {
+      vdoUrl += (vdoUrl.includes("?") ? "&" : "?") + "autoplay=true"
+    }
+    return {
+      type: "iframe" as const,
+      src: vdoUrl,
+    }
+  }
 
   // YouTube match: watch?v=, youtu.be/, embed/, shorts/
   const ytMatch = cleanUrl.match(
@@ -77,13 +89,30 @@ export function MediaFrame({
   videoUrl?: string
   duration?: string
 }) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const userClosedRef = useRef(false)
   const [isPlaying, setIsPlaying] = useState(false)
   const [showSetupGuide, setShowSetupGuide] = useState(false)
   const parsed = parseVideoSource(videoUrl)
 
+  // Automatically start playing once the user scrolls into or lands on this section
+  useEffect(() => {
+    if (!containerRef.current || !parsed || userClosedRef.current) return
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !userClosedRef.current) {
+          setIsPlaying(true)
+        }
+      },
+      { threshold: 0.25 }
+    )
+    observer.observe(containerRef.current)
+    return () => observer.disconnect()
+  }, [parsed])
+
   if (isPlaying && parsed) {
     return (
-      <div className="group relative aspect-video w-full overflow-hidden rounded-3xl border border-foreground/15 bg-black text-background shadow-2xl">
+      <div ref={containerRef} className="group relative aspect-video w-full overflow-hidden rounded-3xl border border-foreground/15 bg-black text-background shadow-2xl">
         {parsed.type === "iframe" ? (
           <iframe
             src={parsed.src}
@@ -103,7 +132,10 @@ export function MediaFrame({
         )}
         <button
           type="button"
-          onClick={() => setIsPlaying(false)}
+          onClick={() => {
+            userClosedRef.current = true
+            setIsPlaying(false)
+          }}
           aria-label="Close video"
           className="absolute right-4 top-4 z-20 flex size-9 items-center justify-center rounded-full bg-background/80 text-foreground shadow-md backdrop-blur-sm transition-transform hover:scale-110 hover:bg-background"
         >
@@ -152,7 +184,7 @@ export function MediaFrame({
   }
 
   return (
-    <div className="group relative aspect-video overflow-hidden rounded-3xl border border-foreground/15 bg-foreground text-background shadow-xl">
+    <div ref={containerRef} className="group relative aspect-video overflow-hidden rounded-3xl border border-foreground/15 bg-foreground text-background shadow-xl">
       <div className="absolute inset-y-0 right-0 w-1/2 bg-[linear-gradient(135deg,rgba(204,255,0,.18),transparent_45%,rgba(255,255,255,.08))]" />
       <div className="absolute left-5 right-5 top-5 flex justify-between font-mono text-[9px] tracking-[.2em] text-background/50">
         <span>ADFIX / {label}</span>
