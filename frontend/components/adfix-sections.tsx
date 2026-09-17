@@ -93,11 +93,47 @@ export function MediaFrame({
   const userClosedRef = useRef(false)
   const [isPlaying, setIsPlaying] = useState(false)
   const [showSetupGuide, setShowSetupGuide] = useState(false)
+  const [dynamicPlayerUrl, setDynamicPlayerUrl] = useState<string | null>(null)
+  const [loadingDynamicOtp, setLoadingDynamicOtp] = useState(false)
+  const [otpError, setOtpError] = useState<string | null>(null)
+
   const parsed = parseVideoSource(videoUrl)
+  const isVdoCipher = Boolean(videoUrl && videoUrl.includes("player.vdocipher.com"))
+
+  // When playing is requested, if it's VdoCipher, fetch a fresh OTP from /api/vsl-playback
+  useEffect(() => {
+    if (!isPlaying) return
+
+    if (isVdoCipher) {
+      setLoadingDynamicOtp(true)
+      setOtpError(null)
+
+      fetch("/api/vsl-playback")
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success && data.playerUrl) {
+            setDynamicPlayerUrl(data.playerUrl)
+          } else if (data.needsSecret) {
+            setOtpError(data.error)
+          } else {
+            // Fallback to parsed URL
+            setDynamicPlayerUrl(parsed?.src || videoUrl)
+          }
+        })
+        .catch(() => {
+          setDynamicPlayerUrl(parsed?.src || videoUrl)
+        })
+        .finally(() => {
+          setLoadingDynamicOtp(false)
+        })
+    } else if (parsed) {
+      setDynamicPlayerUrl(parsed.src)
+    }
+  }, [isPlaying, isVdoCipher, videoUrl, parsed])
 
   // Automatically start playing once the user scrolls into or lands on this section
   useEffect(() => {
-    if (!containerRef.current || !parsed || userClosedRef.current) return
+    if (!containerRef.current || (!parsed && !isVdoCipher) || userClosedRef.current) return
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting && !userClosedRef.current) {
@@ -108,41 +144,96 @@ export function MediaFrame({
     )
     observer.observe(containerRef.current)
     return () => observer.disconnect()
-  }, [parsed])
+  }, [parsed, isVdoCipher])
 
-  if (isPlaying && parsed) {
-    return (
-      <div ref={containerRef} className="group relative aspect-video w-full overflow-hidden rounded-3xl border border-foreground/15 bg-black text-background shadow-2xl">
-        {parsed.type === "iframe" ? (
-          <iframe
-            src={parsed.src}
-            title={label}
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-            allowFullScreen
-            className="h-full w-full border-0"
-          />
-        ) : (
-          <video
-            src={parsed.src}
-            controls
-            autoPlay
-            playsInline
-            className="h-full w-full object-contain"
-          />
-        )}
-        <button
-          type="button"
-          onClick={() => {
-            userClosedRef.current = true
-            setIsPlaying(false)
-          }}
-          aria-label="Close video"
-          className="absolute right-4 top-4 z-20 flex size-9 items-center justify-center rounded-full bg-background/80 text-foreground shadow-md backdrop-blur-sm transition-transform hover:scale-110 hover:bg-background"
-        >
-          <X className="size-5" />
-        </button>
-      </div>
-    )
+  if (isPlaying) {
+    if (loadingDynamicOtp) {
+      return (
+        <div ref={containerRef} className="group relative aspect-video w-full overflow-hidden rounded-3xl border border-foreground/15 bg-black text-background shadow-2xl flex flex-col items-center justify-center gap-3">
+          <div className="size-8 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+          <p className="font-mono text-xs text-background/60 tracking-wider">CONNECTING SECURE STREAM...</p>
+        </div>
+      )
+    }
+
+    if (otpError) {
+      return (
+        <div ref={containerRef} className="relative aspect-video w-full overflow-hidden rounded-3xl border border-accent/40 bg-foreground p-6 text-background shadow-2xl flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="font-mono text-[10px] tracking-widest text-accent">VDOCIPHER SETUP REQUIRED</span>
+            <button
+              type="button"
+              onClick={() => {
+                userClosedRef.current = true
+                setIsPlaying(false)
+                setOtpError(null)
+              }}
+              aria-label="Close error notice"
+              className="rounded-full border border-background/20 p-1 hover:bg-background/10"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-accent">Dynamic VdoCipher OTP Required</h3>
+            <p className="mt-2 font-mono text-xs text-background/80 leading-relaxed">
+              {otpError}
+            </p>
+            <p className="mt-3 font-mono text-[11px] text-background/60">
+              Add <span className="text-accent font-mono font-bold">VDOCIPHER_API_SECRET</span> to your <span className="text-accent font-mono">frontend/.env</span> file so the server can generate fresh, unexpiring playback sessions automatically for all mobile and desktop visitors.
+            </p>
+          </div>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setDynamicPlayerUrl(parsed?.src || videoUrl)
+                setOtpError(null)
+              }}
+              className="rounded-full border border-background/20 px-4 py-1.5 font-mono text-xs font-semibold"
+            >
+              Try Stored Link
+            </button>
+          </div>
+        </div>
+      )
+    }
+
+    if (dynamicPlayerUrl) {
+      return (
+        <div ref={containerRef} className="group relative aspect-video w-full overflow-hidden rounded-3xl border border-foreground/15 bg-black text-background shadow-2xl">
+          {parsed?.type === "video" ? (
+            <video
+              src={dynamicPlayerUrl}
+              controls
+              autoPlay
+              playsInline
+              className="h-full w-full object-contain"
+            />
+          ) : (
+            <iframe
+              src={dynamicPlayerUrl}
+              title={label}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowFullScreen
+              className="h-full w-full border-0"
+            />
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              userClosedRef.current = true
+              setIsPlaying(false)
+              setDynamicPlayerUrl(null)
+            }}
+            aria-label="Close video"
+            className="absolute right-4 top-4 z-20 flex size-9 items-center justify-center rounded-full bg-background/80 text-foreground shadow-md backdrop-blur-sm transition-transform hover:scale-110 hover:bg-background"
+          >
+            <X className="size-5" />
+          </button>
+        </div>
+      )
+    }
   }
 
   if (showSetupGuide && !parsed) {
