@@ -57,6 +57,11 @@ public class ResourceController {
         ResourceResponse resource = resourceService.recordDownload(resourceId);
 
         String downloadUrl = resource.getResourceUrl();
+        if (downloadUrl != null && downloadUrl.startsWith("/api/v1/resources/files/")) {
+            if (!downloadUrl.contains("download=true")) {
+                downloadUrl += (downloadUrl.contains("?") ? "&" : "?") + "download=true";
+            }
+        }
 
         return ResponseEntity.ok(ApiResponse.success(Map.of(
                 "id", resource.getId(),

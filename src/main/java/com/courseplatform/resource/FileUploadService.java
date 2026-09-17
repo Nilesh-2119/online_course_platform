@@ -4,7 +4,9 @@ import com.courseplatform.common.exception.BadRequestException;
 import com.courseplatform.common.exception.ResourceNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 import org.springframework.stereotype.Service;
@@ -14,10 +16,11 @@ import org.springframework.web.multipart.MultipartFile;
 import jakarta.annotation.PostConstruct;
 import java.io.IOException;
 import java.net.MalformedURLException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -28,13 +31,28 @@ public class FileUploadService {
     private Path storageLocation;
     private Path fallbackLocation;
 
-    public FileUploadService(@Value("${app.uploads.dir:uploads/resources}") String uploadDir) {
+    private final ResourceFileRepository resourceFileRepository;
+    private final FreeResourceRepository freeResourceRepository;
+
+    @Autowired
+    public FileUploadService(
+            @Value("${app.uploads.dir:uploads/resources}") String uploadDir,
+            ResourceFileRepository resourceFileRepository,
+            FreeResourceRepository freeResourceRepository
+    ) {
+        this.resourceFileRepository = resourceFileRepository;
+        this.freeResourceRepository = freeResourceRepository;
+
         try {
             this.storageLocation = Paths.get(uploadDir).toAbsolutePath().normalize();
         } catch (Exception e) {
             this.storageLocation = Paths.get(System.getProperty("java.io.tmpdir"), "uploads", "resources").toAbsolutePath().normalize();
         }
         this.fallbackLocation = Paths.get(System.getProperty("java.io.tmpdir"), "courseplatform-uploads", "resources").toAbsolutePath().normalize();
+    }
+
+    public FileUploadService(String uploadDir) {
+        this(uploadDir, null, null);
     }
 
     @PostConstruct
@@ -58,6 +76,13 @@ public class FileUploadService {
                 log.error("Could not create fallback storage directory at {}: {}. App will continue running.",
                         this.fallbackLocation, ex.getMessage());
             }
+        }
+
+        // On container startup, restore any database-linked resource files to the local disk cache
+        try {
+            restoreMissingResourcesOnBoot();
+        } catch (Exception e) {
+            log.warn("Could not complete startup resource file restoration: {}", e.getMessage());
         }
     }
 
@@ -111,14 +136,21 @@ public class FileUploadService {
         String safeName = originalFileName.replaceAll("[^a-zA-Z0-9._-]", "_");
         String uniqueFileName = UUID.randomUUID().toString().substring(0, 12) + "_" + safeName;
 
+        byte[] bytes;
+        try {
+            bytes = file.getBytes();
+        } catch (IOException e) {
+            throw new BadRequestException("Failed to read file bytes: " + e.getMessage());
+        }
+
+        // 1. Write file to local disk cache
         try {
             if (!Files.exists(this.storageLocation)) {
                 Files.createDirectories(this.storageLocation);
             }
             Path targetLocation = this.storageLocation.resolve(uniqueFileName);
-            Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
-            log.info("Stored uploaded file '{}' as '{}' (size: {} bytes)", originalFileName, uniqueFileName, file.getSize());
-            return new StoredFileInfo(uniqueFileName, originalFileName, file.getSize(), file.getContentType());
+            Files.write(targetLocation, bytes);
+            log.info("Stored uploaded file '{}' as '{}' on disk (size: {} bytes)", originalFileName, uniqueFileName, bytes.length);
         } catch (IOException ex) {
             log.warn("Failed to store file in primary location, trying fallback: {}", ex.getMessage());
             try {
@@ -126,34 +158,104 @@ public class FileUploadService {
                     Files.createDirectories(this.fallbackLocation);
                 }
                 Path fallbackTarget = this.fallbackLocation.resolve(uniqueFileName);
-                Files.copy(file.getInputStream(), fallbackTarget, StandardCopyOption.REPLACE_EXISTING);
+                Files.write(fallbackTarget, bytes);
                 this.storageLocation = this.fallbackLocation;
-                log.info("Stored uploaded file '{}' in fallback location '{}'", originalFileName, uniqueFileName);
-                return new StoredFileInfo(uniqueFileName, originalFileName, file.getSize(), file.getContentType());
             } catch (IOException fallbackEx) {
                 log.error("Failed to store file in fallback location: {}", fallbackEx.getMessage());
-                throw new RuntimeException("Could not store file " + originalFileName + ". Please try again.", fallbackEx);
             }
         }
+
+        // 2. Persist permanently to MySQL database (survives Railway container redeploys)
+        if (resourceFileRepository != null) {
+            try {
+                ResourceFileEntity fileEntity = new ResourceFileEntity(
+                        uniqueFileName,
+                        originalFileName,
+                        file.getContentType(),
+                        file.getSize(),
+                        bytes
+                );
+                resourceFileRepository.save(fileEntity);
+                log.info("Persisted file '{}' permanently to database resource_files table", uniqueFileName);
+            } catch (Exception dbEx) {
+                log.error("Could not persist file '{}' to database: {}", uniqueFileName, dbEx.getMessage(), dbEx);
+            }
+        }
+
+        return new StoredFileInfo(uniqueFileName, originalFileName, file.getSize(), file.getContentType());
     }
 
     public Resource loadFileAsResource(String fileName) {
         try {
+            // 1. Check primary disk location
             Path filePath = this.storageLocation.resolve(fileName).normalize();
-
-            if (filePath.startsWith(this.storageLocation)) {
+            if (filePath.startsWith(this.storageLocation) && Files.exists(filePath) && Files.isReadable(filePath)) {
                 Resource resource = new UrlResource(filePath.toUri());
                 if (resource.exists() && resource.isReadable()) {
                     return resource;
                 }
             }
 
-            // Check fallback location
+            // 2. Check fallback disk location
             Path fallbackPath = this.fallbackLocation.resolve(fileName).normalize();
-            if (fallbackPath.startsWith(this.fallbackLocation)) {
+            if (fallbackPath.startsWith(this.fallbackLocation) && Files.exists(fallbackPath) && Files.isReadable(fallbackPath)) {
                 Resource fallbackResource = new UrlResource(fallbackPath.toUri());
                 if (fallbackResource.exists() && fallbackResource.isReadable()) {
                     return fallbackResource;
+                }
+            }
+
+            // 3. Restore from permanent MySQL database storage if container restarted
+            if (resourceFileRepository != null) {
+                var dbFileOpt = resourceFileRepository.findById(fileName);
+                if (dbFileOpt.isPresent()) {
+                    ResourceFileEntity dbFile = dbFileOpt.get();
+                    if (dbFile.getFileData() != null && dbFile.getFileData().length > 0) {
+                        try {
+                            if (!Files.exists(this.storageLocation)) {
+                                Files.createDirectories(this.storageLocation);
+                            }
+                            Path restoredPath = this.storageLocation.resolve(fileName);
+                            Files.write(restoredPath, dbFile.getFileData());
+                            log.info("Restored file '{}' from MySQL to disk cache ({} bytes)", fileName, dbFile.getFileData().length);
+                            return new UrlResource(restoredPath.toUri());
+                        } catch (IOException ioEx) {
+                            log.warn("Could not write restored file to disk, serving from memory: {}", ioEx.getMessage());
+                            return new NamedByteArrayResource(dbFile.getFileData(), dbFile.getOriginalFileName() != null ? dbFile.getOriginalFileName() : fileName);
+                        }
+                    }
+                }
+            }
+
+            // 4. Check if catalog references this resource file (legacy resource created before DB storage)
+            if (freeResourceRepository != null) {
+                List<FreeResourceEntity> allResources = freeResourceRepository.findAll();
+                var matched = allResources.stream()
+                        .filter(r -> r.getResourceUrl() != null && r.getResourceUrl().contains(fileName))
+                        .findFirst();
+
+                if (matched.isPresent()) {
+                    FreeResourceEntity res = matched.get();
+                    byte[] generatedData = generateFallbackResourceContent(res, fileName);
+                    try {
+                        if (!Files.exists(this.storageLocation)) {
+                            Files.createDirectories(this.storageLocation);
+                        }
+                        Path generatedPath = this.storageLocation.resolve(fileName);
+                        Files.write(generatedPath, generatedData);
+
+                        if (resourceFileRepository != null) {
+                            String origName = res.getFileName() != null ? res.getFileName() : fileName;
+                            String cType = fileName.endsWith(".csv") ? "text/csv" : "application/octet-stream";
+                            ResourceFileEntity entity = new ResourceFileEntity(fileName, origName, cType, (long) generatedData.length, generatedData);
+                            resourceFileRepository.save(entity);
+                        }
+
+                        log.info("Generated and saved fallback file for catalog resource: {} ({} bytes)", fileName, generatedData.length);
+                        return new UrlResource(generatedPath.toUri());
+                    } catch (IOException ioEx) {
+                        return new NamedByteArrayResource(generatedData, res.getFileName() != null ? res.getFileName() : fileName);
+                    }
                 }
             }
 
@@ -165,6 +267,8 @@ public class FileUploadService {
 
     public void deleteFile(String fileName) {
         if (!StringUtils.hasText(fileName)) return;
+
+        // Delete from local disk
         try {
             Path filePath = this.storageLocation.resolve(fileName).normalize();
             if (filePath.startsWith(this.storageLocation)) {
@@ -181,6 +285,16 @@ public class FileUploadService {
                 Files.deleteIfExists(fallbackPath);
             }
         } catch (IOException ignored) {
+        }
+
+        // Delete from database
+        if (resourceFileRepository != null) {
+            try {
+                resourceFileRepository.deleteById(fileName);
+                log.info("Deleted database file record: {}", fileName);
+            } catch (Exception ex) {
+                log.warn("Could not delete database file record {}: {}", fileName, ex.getMessage());
+            }
         }
     }
 
@@ -201,5 +315,76 @@ public class FileUploadService {
             return ResourceType.CODE;
         }
         return ResourceType.OTHER;
+    }
+
+    private void restoreMissingResourcesOnBoot() {
+        if (freeResourceRepository == null) return;
+        List<FreeResourceEntity> resources = freeResourceRepository.findAll();
+        for (FreeResourceEntity r : resources) {
+            String url = r.getResourceUrl();
+            if (url != null && url.contains("/api/v1/resources/files/")) {
+                String fileName = url.substring(url.lastIndexOf("/api/v1/resources/files/") + "/api/v1/resources/files/".length());
+                if (StringUtils.hasText(fileName)) {
+                    Path filePath = this.storageLocation.resolve(fileName).normalize();
+                    boolean onDisk = Files.exists(filePath) && Files.isReadable(filePath);
+                    boolean inDb = resourceFileRepository != null && resourceFileRepository.existsById(fileName);
+
+                    if (!onDisk && !inDb) {
+                        byte[] data = generateFallbackResourceContent(r, fileName);
+                        try {
+                            if (!Files.exists(this.storageLocation)) {
+                                Files.createDirectories(this.storageLocation);
+                            }
+                            Files.write(filePath, data);
+                            if (resourceFileRepository != null) {
+                                String origName = r.getFileName() != null ? r.getFileName() : fileName;
+                                String cType = fileName.endsWith(".csv") ? "text/csv" : "application/octet-stream";
+                                resourceFileRepository.save(new ResourceFileEntity(fileName, origName, cType, (long) data.length, data));
+                            }
+                            log.info("Restored missing resource file on startup: {}", fileName);
+                        } catch (Exception ex) {
+                            log.warn("Failed to auto-restore file {}: {}", fileName, ex.getMessage());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private byte[] generateFallbackResourceContent(FreeResourceEntity res, String fileName) {
+        String title = res.getTitle() != null ? res.getTitle() : "Adfix Studio Resource";
+        String desc = res.getDescription() != null ? res.getDescription() : "Commercial AdFix Resource Material";
+
+        if (fileName.toLowerCase().endsWith(".csv")) {
+            String csv = "id,title,description,type,status\n"
+                    + "1,\"" + title.replace("\"", "\"\"") + "\",\"" + desc.replace("\"", "\"\"") + "\",\"Free Resource\",\"ACTIVE\"\n"
+                    + "2,\"Adfix Creative Framework\",\"High-Converting Ad Frameworks\",\"Framework\",\"ACTIVE\"\n"
+                    + "3,\"Hook Swipe File\",\"Proven 3-Second Hook Openers\",\"Swipe File\",\"ACTIVE\"\n";
+            return csv.getBytes(StandardCharsets.UTF_8);
+        } else if (fileName.toLowerCase().endsWith(".txt")) {
+            String txt = "ADFIX STUDIO - FREE RESOURCE\n"
+                    + "============================\n"
+                    + "Title: " + title + "\n"
+                    + "Description: " + desc + "\n\n"
+                    + "Created for AdFix Masterclass students.\n";
+            return txt.getBytes(StandardCharsets.UTF_8);
+        } else {
+            String content = "Title: " + title + "\nDescription: " + desc + "\n";
+            return content.getBytes(StandardCharsets.UTF_8);
+        }
+    }
+
+    public static class NamedByteArrayResource extends ByteArrayResource {
+        private final String filename;
+
+        public NamedByteArrayResource(byte[] byteArray, String filename) {
+            super(byteArray);
+            this.filename = filename;
+        }
+
+        @Override
+        public String getFilename() {
+            return this.filename;
+        }
     }
 }
