@@ -336,24 +336,17 @@ export function DashboardView() {
                 </div>
               </div>
 
-              {/* Top CTA */}
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                {!isPurchased ? (
+              {/* Top CTA for free students only */}
+              {!isPurchased && (
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                   <Link
                     href="/buy"
                     className="inline-flex items-center justify-center gap-2 rounded-full bg-foreground px-6 py-3.5 font-mono text-xs font-bold text-background shadow-md transition-transform hover:scale-[1.02] active:scale-95"
                   >
                     UNLOCK FULL COURSE <ArrowRight className="size-4 text-accent" />
                   </Link>
-                ) : (
-                  <Link
-                    href={resumeHref}
-                    className="inline-flex items-center justify-center gap-2 rounded-full bg-foreground px-6 py-3.5 font-mono text-xs font-bold text-background shadow-md transition-transform hover:scale-[1.02] active:scale-95"
-                  >
-                    <Play className="size-3.5 fill-current text-accent" /> RESUME PLAYING
-                  </Link>
-                )}
-              </div>
+                </div>
+              )}
             </div>
 
             {/* Subtle Gradient Accent background glow */}
