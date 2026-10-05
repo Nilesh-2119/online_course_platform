@@ -229,18 +229,6 @@ export function MediaFrame({
               className="h-full w-full border-0"
             />
           )}
-          <button
-            type="button"
-            onClick={() => {
-              userClosedRef.current = true
-              setIsPlaying(false)
-              setDynamicPlayerUrl(null)
-            }}
-            aria-label="Close video"
-            className="absolute right-4 top-4 z-20 flex size-9 items-center justify-center rounded-full bg-background/80 text-foreground shadow-md backdrop-blur-sm transition-transform hover:scale-110 hover:bg-background"
-          >
-            <X className="size-5" />
-          </button>
         </div>
       )
     }
@@ -315,7 +303,26 @@ export function MediaFrame({
 
 export function AdfixHero() { return <section id="hero" className="relative flex min-h-[calc(100svh-1rem)] items-center overflow-hidden bg-background px-5 pb-12 pt-28 noise-overlay md:h-svh md:px-8"><div className="mx-auto grid w-full max-w-7xl items-center gap-10 lg:grid-cols-[1.08fr_.92fr] lg:gap-14"><motion.div initial="hidden" animate="visible" variants={reveal}><span className="inline-flex items-center gap-2 rounded-full bg-foreground px-3 py-1.5 font-mono text-[10px] tracking-[.2em] text-background"><span className="size-1.5 rounded-full bg-accent" />AD CREATIVE EDUCATION</span><h1 className="mt-7 max-w-4xl text-balance text-[2.7rem] font-black leading-[.94] tracking-[-.07em] min-[360px]:text-[2.85rem] min-[390px]:text-5xl sm:mt-5 sm:text-6xl lg:text-7xl">Turn your average ad into a <span className="text-accent">high-performing story.</span></h1><p className="mt-5 max-w-xl text-pretty font-mono text-sm leading-6 text-muted-foreground md:text-base">We help creators and brands make their ads <strong>scroll-stopping</strong>, <strong>engaging</strong>, and <strong>profitable</strong> through better hooks, scripts, storytelling, and CTA strategy.</p><div className="mt-5 flex flex-wrap gap-2">{["Hook Engineering", "Script Flow Rewrite", "High-Conversion CTAs", "Ad Strategy"].map(tag => <span key={tag} className="rounded-full border border-border px-3 py-1.5 font-mono text-[10px] text-muted-foreground">{tag}</span>)}</div><div className="mt-7 flex flex-col gap-3 sm:flex-row"><button onClick={openPurchase} className="inline-flex items-center justify-center gap-3 rounded-full bg-accent px-6 py-3.5 text-sm font-bold text-accent-foreground">GET INSTANT ACCESS <ArrowRight className="size-4" /></button><a href="#vsl" className="inline-flex items-center justify-center gap-3 rounded-full border-2 border-foreground px-6 py-3.5 text-sm font-bold">WATCH THE VSL <Play className="size-4 fill-current" /></a></div></motion.div><motion.div initial="hidden" animate="visible" variants={reveal} className="relative hidden min-h-[420px] items-center justify-center lg:flex"><div className="absolute right-8 top-4 font-mono text-xs tracking-[.25em] text-muted-foreground"></div><div className="rotate-[-5deg] rounded-[2rem] border border-foreground/10 bg-foreground p-8 text-background shadow-2xl"><p className="font-mono text-xs text-accent">MAKE IT LAND</p><p className="mt-12 max-w-xs text-6xl font-black leading-[.8] tracking-[-.08em]">THE<br />ADFIX<br /><span className="text-accent">METHOD</span></p><p className="mt-16 font-mono text-xs leading-5 text-background/60">Make people stop.<br />Make them care.<br />Make them act.<br /><span className="text-accent">HOOK → STORY → CTA</span></p></div></motion.div></div></section> }
 
-export function VslSection({ videoUrl, duration }: { videoUrl?: string; duration?: string }) { return <section id="vsl" className="bg-foreground px-5 py-16 text-background md:px-8 md:py-20"><div className="mx-auto max-w-5xl"><motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={reveal}><p className="font-mono text-[10px] tracking-[.25em] text-accent">WATCH BEFORE YOU DECIDE</p><h2 className="mt-2 text-4xl font-black leading-none tracking-[-.06em] md:text-6xl">Before you buy, see how AdFix thinks.</h2><p className="mt-3 max-w-xl font-mono text-xs leading-5 text-background/60">See how we approach hooks, scripts, storytelling and CTAs before deciding if the course is right for you.</p></motion.div><div className="mt-8 max-w-2xl"><MediaFrame label="VSL / WATCH THE FRAMEWORK" videoUrl={videoUrl} duration={duration} /></div></div></section> }
+export function VslSection({ videoUrl, duration }: { videoUrl?: string; duration?: string }) {
+  return (
+    <section id="vsl" className="bg-foreground px-5 py-16 text-background md:px-8 md:py-20">
+      <div className="mx-auto max-w-5xl flex flex-col items-center text-center">
+        <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={reveal} className="flex flex-col items-center text-center">
+          <p className="font-mono text-[10px] tracking-[.25em] text-accent">WATCH BEFORE YOU DECIDE</p>
+          <h2 className="mt-2 text-4xl font-black leading-none tracking-[-.06em] md:text-6xl max-w-3xl">
+            Before you buy, see how AdFix thinks.
+          </h2>
+          <p className="mt-3 max-w-xl font-mono text-xs leading-5 text-background/60">
+            See how we approach hooks, scripts, storytelling and CTAs before deciding if the course is right for you.
+          </p>
+        </motion.div>
+        <div className="mt-8 w-full max-w-3xl mx-auto flex justify-center">
+          <MediaFrame label="VSL / WATCH THE FRAMEWORK" videoUrl={videoUrl} duration={duration} />
+        </div>
+      </div>
+    </section>
+  )
+}
 
 const examples = [{ before: "#1 BEFORE — COMMON BORING AD LINE", beforeText: "Society me gym, pool aur 24 ghante security hai ...", after: "AFTER — LUXURY, VISUAL, “WOW” FEEL", afterText: "Yeh simple pool nahi - rooftop infinity pool hai, jahan sunset ke saath-saath aapka stress bhi doob jaata hai. Aur gym? Sirf naam ka nahi. Yahan 6 personal-training stations hain, taaki aapko kabhi wait na karna pade." }, { before: "#2 BEFORE - WEAK, ROBOTIC LINE", beforeText: "Yeh moisturizer skin ko soft banata hai. Abhi buy karein.", after: "AFTER - BENEFIT-DRIVEN & ENGAGING", afterText: "Soft skin nahi ... yeh woh glow deta hai jisse log poochte hain - 'Skincare routine kya hai?' Lightweight, non-sticky aur sirf 7 din me visible result. Bas face wash, apply - aur skin fresh, without extra effort." }, { before: "#3 BEFORE - GENERIC GYM LINE", beforeText: "Humaray gym me modern machines aur certified trainers milte hain.", after: "AFTER - EMOTION & ACCOUNTABILITY", afterText: "Machines toh sabke paas hoti hain ... par yahan aapko milta hai woh personal push jo aapka 'kal se karunga' ko 'aaj se start' me badal deta hai. Aapka goal, humari accountability." }]
 function Example({ item, index }: { item: typeof examples[number]; index: number }) { return <article className="grid gap-5 border-t border-border py-8"><div className="flex flex-col gap-6"><div><p className="font-mono text-[10px] tracking-[.15em] text-muted-foreground">{item.before}</p><p className="mt-2 text-xl font-bold leading-6">“{item.beforeText}”</p></div><div><p className="font-mono text-[10px] tracking-[.15em] text-foreground">{item.after}</p><p className="mt-2 text-xl font-bold leading-6">“{item.afterText}”</p></div></div></article> }
